@@ -8,16 +8,14 @@ import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
 
 import java.time.LocalDate;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 @RestController
 @RequestMapping("/films")
 public class FilmController {
 
     private final Map<Long, Film> films = new HashMap<>();
-    private static final LocalDate FIRST_FILM_DATE = LocalDate.ofYearDay(1895, 362);
+    private static final LocalDate FIRST_FILM_DATE = LocalDate.of(1895, 12, 28);
     private static final Logger log = LoggerFactory.getLogger(FilmController.class);
 
     //Добавляем фильм
@@ -86,13 +84,11 @@ public class FilmController {
                 }
             }
             //Продолжительность
-            if (newFilm.getReleaseDate() != null) {
-                if (newFilm.getDuration() <= 0) {
-                    log.warn("Попытка изменить продолжительность фильма на на значение, не являющиеся положительным числом");
-                    throw new ValidationException("Продолжительность фильма должна быть положительным числом");
-                } else {
-                    oldFilm.setDuration(newFilm.getDuration());
-                }
+            if (newFilm.getDuration() <= 0) {
+                log.warn("Попытка изменить продолжительность фильма на на значение, не являющиеся положительным числом");
+                throw new ValidationException("Продолжительность фильма должна быть положительным числом");
+            } else {
+                oldFilm.setDuration(newFilm.getDuration());
             }
             return oldFilm;
         }
@@ -104,7 +100,7 @@ public class FilmController {
     @GetMapping
     public Collection<Film> findAll() {
         log.info("Получаем список фильмов");
-        return films.values();
+        return new HashSet<>(films.values());
     }
 
     //Получаем айдишник

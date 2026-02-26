@@ -10,6 +10,7 @@ import ru.yandex.practicum.filmorate.model.User;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 
 @RestController
@@ -25,15 +26,18 @@ public class UserController {
         log.info("Добавляем нового пользователя");
         //Проверки
         if (newUser.getEmail() == null || newUser.getEmail().isBlank() || newUser.getEmail().indexOf('@') == -1) {
+            log.warn("Попытка добавления пользователя с неправильной электронной почтой");
             throw new ValidationException("Электронная почта не может быть пустой и должна содержать символ @");
         }
         if (newUser.getLogin() == null || newUser.getLogin().isBlank() || newUser.getLogin().indexOf(' ') >= 0) {
+            log.warn("Попытка добавления пользователя с неправильным логином");
             throw new ValidationException("Логин не может быть пустым и содержать пробелы");
         }
         if (newUser.getName() == null || newUser.getName().isBlank()) {
             newUser.setName(newUser.getLogin());
         }
         if (newUser.getBirthday().isAfter(LocalDate.now())) {
+            log.warn("Попытка добавления пользователя с неправильной датой рождения");
             throw new ValidationException("Дата рождения не может быть в будущем");
         }
         newUser.setId(getNextId());
@@ -46,6 +50,7 @@ public class UserController {
     public User update(@RequestBody User newUser) {
         log.info("Изменяем пользователя");
         if (newUser.getId() == null) {
+            log.warn("Попытка изменения пользователя с неправильным id");
             throw new ValidationException("id должен быть указан");
         }
         if (users.containsKey(newUser.getId())) {
@@ -54,6 +59,7 @@ public class UserController {
             //Почта
             if (newUser.getEmail() != null) {
                 if (newUser.getEmail().isBlank() || newUser.getEmail().indexOf('@') == -1) {
+                    log.warn("Попытка изменения электронной почты пользователя на неправильное");
                     throw new ValidationException("Электронная почта не может быть пустой и должна содержать символ @");
                 } else {
                     oldUser.setEmail(newUser.getEmail());
@@ -62,6 +68,7 @@ public class UserController {
             //Логин
             if (newUser.getLogin() != null) {
                 if (newUser.getLogin().isBlank() || newUser.getLogin().indexOf(' ') >= 0) {
+                    log.warn("Попытка изменения логина пользователя на неправильное");
                     throw new ValidationException("Логин не может быть пустым и содержать пробелы");
                 } else {
                     oldUser.setLogin(newUser.getLogin());
@@ -70,7 +77,11 @@ public class UserController {
             //Имя
             if (newUser.getName() != null) {
                 if (newUser.getName().isBlank()) {
-                    oldUser.setName(newUser.getLogin());
+                    if (newUser.getLogin() != null) {
+                        oldUser.setName(newUser.getLogin());
+                    } else {
+                        oldUser.setName(oldUser.getLogin());
+                    }
                 } else {
                     oldUser.setName(newUser.getName());
                 }
@@ -78,6 +89,7 @@ public class UserController {
             //День рождения
             if (newUser.getBirthday() != null) {
                 if (newUser.getBirthday().isAfter(LocalDate.now())) {
+                    log.warn("Попытка изменения даты рождения пользователя на дату в будущем");
                     throw new ValidationException("Дата рождения не может быть в будущем");
                 } else {
                     oldUser.setBirthday(newUser.getBirthday());
@@ -85,6 +97,7 @@ public class UserController {
             }
             return oldUser;
         }
+        log.warn("Попытка изменить пользователя, id которого не существует в базе");
         throw new NotFoundException("Пользователь с id " + newUser.getId() + " не найден");
     }
 
@@ -92,7 +105,7 @@ public class UserController {
     @GetMapping
     public Collection<User> findAll() {
         log.info("Получаем список пользователей");
-        return users.values();
+        return new HashSet<>(users.values());
     }
 
     //Получаем айдишник
