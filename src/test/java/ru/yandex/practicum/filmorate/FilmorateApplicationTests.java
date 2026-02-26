@@ -189,6 +189,7 @@ class FilmorateApplicationTests {
 		Exception exception = assertThrows(ValidationException.class, () -> userController.create(user));
 		assertEquals("Электронная почта не может быть пустой и должна содержать символ @", exception.getMessage());
 	}
+
 	@Test //Пользователь с неправильной почтой
 	void iheUserEmailHasNoAtSign() {
 		final User user = new User();
