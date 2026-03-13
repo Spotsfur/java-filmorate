@@ -89,8 +89,7 @@ public class InMemoryUserStorage implements UserStorage {
     public Optional<User> findOne(Long id) {
         if (!users.containsKey(id)) {
             return Optional.empty();
-        }
-        else {
+        } else {
             User user = users.get(id);
             return Optional.of(user);
         }
