@@ -8,6 +8,10 @@ import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.service.film.FilmService;
+import ru.yandex.practicum.filmorate.service.user.UserService;
+import ru.yandex.practicum.filmorate.storage.film.InMemoryFilmStorage;
+import ru.yandex.practicum.filmorate.storage.user.InMemoryUserStorage;
 
 import java.time.LocalDate;
 
@@ -18,8 +22,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class FilmorateApplicationTests {
 
-	static FilmController filmController = new FilmController();
-	static UserController userController = new UserController();
+	static InMemoryUserStorage inMemoryUserStorage = new InMemoryUserStorage();
+	static UserService userService = new UserService(inMemoryUserStorage);
+	static UserController userController = new UserController(userService);
+
+	static InMemoryFilmStorage inMemoryFilmStorage = new InMemoryFilmStorage();
+	static FilmService filmService = new FilmService(inMemoryFilmStorage, inMemoryUserStorage);
+	static FilmController filmController = new FilmController(filmService);
 
 	@Test
 	void contextLoads() {
