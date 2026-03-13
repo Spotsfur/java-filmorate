@@ -6,9 +6,9 @@ import java.util.Collection;
 
 public interface FilmStorage {
 
-    public Film create(Film newFilm);
+    Film create(Film newFilm);
 
-    public Film update(Film newFilm);
+    Film update(Film newFilm);
 
-    public Collection<Film> findAll();
+    Collection<Film> findAll();
 }

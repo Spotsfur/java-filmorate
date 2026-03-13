@@ -21,7 +21,6 @@ public class InMemoryFilmStorage implements FilmStorage {
 
     public Film create(Film newFilm) {
         log.info("Добавляем новый фильм");
-        //Проверки
         if (newFilm.getName() == null || newFilm.getName().isBlank()) {
             log.warn("Попытка добавления фильма с неправильным названием");
             throw new ValidationException("Название не может быть пустым");
@@ -38,7 +37,6 @@ public class InMemoryFilmStorage implements FilmStorage {
             log.warn("Попытка добавить фильм с продолжительностью, не являющейся положительным числом");
             throw new ValidationException("Продолжительность фильма должна быть положительным числом");
         }
-        //Суём данные
         newFilm.setId(getNextId());
         films.put(newFilm.getId(), newFilm);
         return newFilm;
@@ -50,47 +48,42 @@ public class InMemoryFilmStorage implements FilmStorage {
             log.warn("Попытка изменения фильма с неправильным id");
             throw new ValidationException("id должен быть указан");
         }
-        if (films.containsKey(newFilm.getId())) {
-            Film oldFilm = films.get(newFilm.getId());
-            //Изменяем только те поля, которые были переданы
-            //Название
-            if (newFilm.getName() != null) {
-                if (newFilm.getName().isBlank()) {
-                    log.warn("Попытка изменения названия фильма на пустое");
-                    throw new ValidationException("Название не может быть пустым");
-                } else {
-                    oldFilm.setName(newFilm.getName());
-                }
-            }
-            //Описание
-            if (newFilm.getDescription() != null) {
-                if (newFilm.getDescription().length() > 200) {
-                    log.warn("Попытка изменения длины описания фильма на слишком большую");
-                    throw new ValidationException("Максимальная длина описания — 200 символов");
-                } else {
-                    oldFilm.setDescription(newFilm.getDescription());
-                }
-            }
-            //Дата
-            if (newFilm.getReleaseDate() != null) {
-                if (newFilm.getReleaseDate().isBefore(FIRST_FILM_DATE)) {
-                    log.warn("Попытка изменить дату выхода фильма на ранее чем 28 декабря 1895 года");
-                    throw new ValidationException("Дата релиза — не раньше 28 декабря 1895 года");
-                } else {
-                    oldFilm.setReleaseDate(newFilm.getReleaseDate());
-                }
-            }
-            //Продолжительность
-            if (newFilm.getDuration() <= 0) {
-                log.warn("Попытка изменить продолжительность фильма на на значение, не являющиеся положительным числом");
-                throw new ValidationException("Продолжительность фильма должна быть положительным числом");
-            } else {
-                oldFilm.setDuration(newFilm.getDuration());
-            }
-            return oldFilm;
+        if (!films.containsKey(newFilm.getId())) {
+            log.warn("Попытка изменить фильм, id которого не существует в базе");
+            throw new NotFoundException("Фильм с id " + newFilm.getId() + " не найден");
         }
-        log.warn("Попытка изменить фильм, id которого не существует в базе");
-        throw new NotFoundException("Фильм с id " + newFilm.getId() + " не найден");
+        Film oldFilm = films.get(newFilm.getId());
+        if (newFilm.getName() != null) {
+            if (newFilm.getName().isBlank()) {
+                log.warn("Попытка изменения названия фильма на пустое");
+                throw new ValidationException("Название не может быть пустым");
+            } else {
+                oldFilm.setName(newFilm.getName());
+            }
+        }
+        if (newFilm.getDescription() != null) {
+            if (newFilm.getDescription().length() > 200) {
+                log.warn("Попытка изменения длины описания фильма на слишком большую");
+                throw new ValidationException("Максимальная длина описания — 200 символов");
+            } else {
+                oldFilm.setDescription(newFilm.getDescription());
+            }
+        }
+        if (newFilm.getReleaseDate() != null) {
+            if (newFilm.getReleaseDate().isBefore(FIRST_FILM_DATE)) {
+                log.warn("Попытка изменить дату выхода фильма на ранее чем 28 декабря 1895 года");
+                throw new ValidationException("Дата релиза — не раньше 28 декабря 1895 года");
+            } else {
+                oldFilm.setReleaseDate(newFilm.getReleaseDate());
+            }
+        }
+        if (newFilm.getDuration() <= 0) {
+            log.warn("Попытка изменить продолжительность фильма на на значение, не являющиеся положительным числом");
+            throw new ValidationException("Продолжительность фильма должна быть положительным числом");
+        } else {
+            oldFilm.setDuration(newFilm.getDuration());
+        }
+        return oldFilm;
     }
 
     public Collection<Film> findAll() {

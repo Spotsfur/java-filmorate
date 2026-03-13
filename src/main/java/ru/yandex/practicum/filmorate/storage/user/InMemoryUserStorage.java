@@ -8,10 +8,7 @@ import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
 
 import java.time.LocalDate;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
+import java.util.*;
 
 @Component
 public class InMemoryUserStorage implements UserStorage {
@@ -20,7 +17,6 @@ public class InMemoryUserStorage implements UserStorage {
 
     public User create(User newUser) {
         log.info("Добавляем нового пользователя");
-        //Проверки
         if (newUser.getEmail() == null || newUser.getEmail().isBlank() || newUser.getEmail().indexOf('@') == -1) {
             log.warn("Попытка добавления пользователя с неправильной электронной почтой");
             throw new ValidationException("Электронная почта не может быть пустой и должна содержать символ @");
@@ -47,52 +43,57 @@ public class InMemoryUserStorage implements UserStorage {
             log.warn("Попытка изменения пользователя с неправильным id");
             throw new ValidationException("id должен быть указан");
         }
-        if (users.containsKey(newUser.getId())) {
-            User oldUser = users.get(newUser.getId());
-            //Изменяем только те поля, которые были переданы
-            //Почта
-            if (newUser.getEmail() != null) {
-                if (newUser.getEmail().isBlank() || newUser.getEmail().indexOf('@') == -1) {
-                    log.warn("Попытка изменения электронной почты пользователя на неправильное");
-                    throw new ValidationException("Электронная почта не может быть пустой и должна содержать символ @");
-                } else {
-                    oldUser.setEmail(newUser.getEmail());
-                }
-            }
-            //Логин
-            if (newUser.getLogin() != null) {
-                if (newUser.getLogin().isBlank() || newUser.getLogin().indexOf(' ') >= 0) {
-                    log.warn("Попытка изменения логина пользователя на неправильное");
-                    throw new ValidationException("Логин не может быть пустым и содержать пробелы");
-                } else {
-                    oldUser.setLogin(newUser.getLogin());
-                }
-            }
-            //Имя
-            if (newUser.getName() != null) {
-                if (newUser.getName().isBlank()) {
-                    if (newUser.getLogin() != null) {
-                        oldUser.setName(newUser.getLogin());
-                    } else {
-                        oldUser.setName(oldUser.getLogin());
-                    }
-                } else {
-                    oldUser.setName(newUser.getName());
-                }
-            }
-            //День рождения
-            if (newUser.getBirthday() != null) {
-                if (newUser.getBirthday().isAfter(LocalDate.now())) {
-                    log.warn("Попытка изменения даты рождения пользователя на дату в будущем");
-                    throw new ValidationException("Дата рождения не может быть в будущем");
-                } else {
-                    oldUser.setBirthday(newUser.getBirthday());
-                }
-            }
-            return oldUser;
+        if (!users.containsKey(newUser.getId())) {
+            log.warn("Попытка изменить пользователя, id которого не существует в базе");
+            throw new NotFoundException("Пользователь с id " + newUser.getId() + " не найден");
         }
-        log.warn("Попытка изменить пользователя, id которого не существует в базе");
-        throw new NotFoundException("Пользователь с id " + newUser.getId() + " не найден");
+        User oldUser = users.get(newUser.getId());
+        if (newUser.getEmail() != null) {
+            if (newUser.getEmail().isBlank() || newUser.getEmail().indexOf('@') == -1) {
+                log.warn("Попытка изменения электронной почты пользователя на неправильное");
+                throw new ValidationException("Электронная почта не может быть пустой и должна содержать символ @");
+            } else {
+                oldUser.setEmail(newUser.getEmail());
+            }
+        }
+        if (newUser.getLogin() != null) {
+            if (newUser.getLogin().isBlank() || newUser.getLogin().indexOf(' ') >= 0) {
+                log.warn("Попытка изменения логина пользователя на неправильное");
+                throw new ValidationException("Логин не может быть пустым и содержать пробелы");
+            } else {
+                oldUser.setLogin(newUser.getLogin());
+            }
+        }
+        if (newUser.getName() != null) {
+            if (newUser.getName().isBlank()) {
+                if (newUser.getLogin() != null) {
+                    oldUser.setName(newUser.getLogin());
+                } else {
+                    oldUser.setName(oldUser.getLogin());
+                }
+            } else {
+                oldUser.setName(newUser.getName());
+            }
+        }
+        if (newUser.getBirthday() != null) {
+            if (newUser.getBirthday().isAfter(LocalDate.now())) {
+                log.warn("Попытка изменения даты рождения пользователя на дату в будущем");
+                throw new ValidationException("Дата рождения не может быть в будущем");
+            } else {
+                oldUser.setBirthday(newUser.getBirthday());
+            }
+        }
+        return oldUser;
+    }
+
+    public Optional<User> findOne(Long id) {
+        if (!users.containsKey(id)) {
+            return Optional.empty();
+        }
+        else {
+            User user = users.get(id);
+            return Optional.of(user);
+        }
     }
 
     public Collection<User> findAll() {
