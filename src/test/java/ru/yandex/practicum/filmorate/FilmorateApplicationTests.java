@@ -1,315 +1,263 @@
 package ru.yandex.practicum.filmorate;
 
-import org.junit.jupiter.api.*;
-import org.springframework.boot.test.context.SpringBootTest;
-import ru.yandex.practicum.filmorate.controller.FilmController;
-import ru.yandex.practicum.filmorate.controller.UserController;
-import ru.yandex.practicum.filmorate.exception.NotFoundException;
-import ru.yandex.practicum.filmorate.exception.ValidationException;
+import lombok.RequiredArgsConstructor;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
+import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
+import org.springframework.context.annotation.Import;
 import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.model.Mpa;
 import ru.yandex.practicum.filmorate.model.User;
-import ru.yandex.practicum.filmorate.service.film.FilmService;
-import ru.yandex.practicum.filmorate.service.user.UserService;
-import ru.yandex.practicum.filmorate.storage.film.InMemoryFilmStorage;
-import ru.yandex.practicum.filmorate.storage.user.InMemoryUserStorage;
+import ru.yandex.practicum.filmorate.storage.film.FilmDbStorage;
+import ru.yandex.practicum.filmorate.storage.user.UserDbStorage;
 
 import java.time.LocalDate;
+import java.util.Collection;
+import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@JdbcTest
+@AutoConfigureTestDatabase
+@RequiredArgsConstructor(onConstructor_ = @Autowired)
+@Import({UserDbStorage.class, FilmDbStorage.class})
 class FilmorateApplicationTests {
 
-	static InMemoryUserStorage inMemoryUserStorage = new InMemoryUserStorage();
-	static UserService userService = new UserService(inMemoryUserStorage);
-	static UserController userController = new UserController(userService);
-
-	static InMemoryFilmStorage inMemoryFilmStorage = new InMemoryFilmStorage();
-	static FilmService filmService = new FilmService(inMemoryFilmStorage, inMemoryUserStorage);
-	static FilmController filmController = new FilmController(filmService);
+	private final UserDbStorage userStorage;
+	private final FilmDbStorage filmStorage;
 
 	@Test
 	void contextLoads() {
 	}
 
-	@Test //Валидный фильм
-	@Order(1) //Этот тест будет первый, с этими данными будем работать при изменении
-	void isTheValidFilm() {
-		final Film film = new Film();
-		film.setName("Первый фильм");
-		film.setDescription("Описание первого фильма");
-		film.setReleaseDate(LocalDate.now());
-		film.setDuration(100);
-		filmController.create(film);
+	//ТЕСТЫ СЛОЯ USER
+
+	@Test
+	public void testCreateAndFindUserById() {
+		User newUser = User.builder()
+				.email("first@user.com")
+				.login("UserLogin")
+				.name("UserName")
+				.birthday(LocalDate.of(1995, 5, 10))
+				.build();
+
+		User savedUser = userStorage.create(newUser);
+		Optional<User> userOptional = userStorage.findOne(savedUser.getId());
+
+		assertThat(userOptional)
+				.isPresent()
+				.hasValueSatisfying(user -> {
+					assertThat(user).hasFieldOrPropertyWithValue("id", savedUser.getId());
+					assertThat(user).hasFieldOrPropertyWithValue("email", "first@user.com");
+					assertThat(user).hasFieldOrPropertyWithValue("login", "UserLogin");
+					assertThat(user).hasFieldOrPropertyWithValue("name", "UserName");
+				});
 	}
 
-	@Test //Пустой экземпляр фильма
-	void theFilmHasNoData() {
-		final Film film = new Film();
-		Exception exception = assertThrows(ValidationException.class, () -> filmController.create(film));
-		assertEquals("Название не может быть пустым", exception.getMessage());
+	@Test
+	public void testNullValueOfUserNameIsLogin() {
+		//Пустое имя пользователя приравнивается к логину
+		User userWithoutName = User.builder()
+				.email("new@user.com")
+				.login("OnlyLogin")
+				.birthday(LocalDate.of(2000, 1, 1))
+				.build();
+
+		User savedUser = userStorage.create(userWithoutName);
+
+		assertThat(savedUser.getName()).isEqualTo("OnlyLogin");
 	}
 
-	@Test //Фильм без названия
-	void noNameFilm() {
-		final Film film = new Film();
-		film.setName(" ");
-		film.setDescription("Описание фильма");
-		film.setReleaseDate(LocalDate.now());
-		film.setDuration(100);
-		Exception exception = assertThrows(ValidationException.class, () -> filmController.create(film));
-		assertEquals("Название не может быть пустым", exception.getMessage());
+	@Test
+	public void testUpdateUser() {
+		User user = userStorage.create(User.builder()
+				.email("old@email.com")
+				.login("login")
+				.name("Old Name")
+				.birthday(LocalDate.of(1990, 1, 1))
+				.build());
+
+		user.setEmail("new@email.com");
+		user.setName("New Name");
+		userStorage.update(user);
+
+		Optional<User> userOptional = userStorage.findOne(user.getId());
+
+		assertThat(userOptional)
+				.isPresent()
+				.hasValueSatisfying(u -> {
+					assertThat(u).hasFieldOrPropertyWithValue("email", "new@email.com");
+					assertThat(u).hasFieldOrPropertyWithValue("name", "New Name");
+				});
 	}
 
-	@Test //Фильм с длиной описания 200
-	void descriptionLengthIs200() {
-        String description = "0123456789".repeat(20);
-		final Film film = new Film();
-		film.setName("Название фильма");
-		film.setDescription(description);
-		film.setReleaseDate(LocalDate.now());
-		film.setDuration(100);
-		filmController.create(film);
+	@Test
+	public void testFindAllUsers() {
+		User user1 = userStorage.create(User.builder().email("1@e.com").login("l1").birthday(LocalDate.now()).build());
+		User user2 = userStorage.create(User.builder().email("2@e.com").login("l2").birthday(LocalDate.now()).build());
+
+		Collection<User> users = userStorage.findAll();
+
+		assertThat(users)
+				.isNotEmpty()
+				.hasSize(2)
+				.extracting(User::getLogin)
+				.containsExactlyInAnyOrder("l1", "l2");
 	}
 
-	@Test //Фильм с длиной описания 201
-	void descriptionLengthIs201() {
-        String description = "0123456789".repeat(20) + "0";
-		final Film film = new Film();
-		film.setName("Название фильма");
-		film.setDescription(description);
-		film.setReleaseDate(LocalDate.now());
-		film.setDuration(100);
-		Exception exception = assertThrows(ValidationException.class, () -> filmController.create(film));
-		assertEquals("Максимальная длина описания — 200 символов", exception.getMessage());
+	//ТЕСТЫ СЛОЯ FILM
+
+	@Test
+	public void testCreateAndFindFilmById() {
+		Film newFilm = Film.builder()
+				.name("Первый фильм")
+				.description("Описание первого фильма")
+				.releaseDate(LocalDate.of(2020, 1, 1))
+				.duration(100)
+				.mpa(Mpa.builder().id(1).build()) //В базе из data.sql id=1 это рейтинг 'G'
+				.build();
+
+		Film savedFilm = filmStorage.create(newFilm);
+		Optional<Film> filmOptional = filmStorage.findOne(savedFilm.getId());
+
+		assertThat(filmOptional)
+				.isPresent()
+				.hasValueSatisfying(film -> {
+					assertThat(film).hasFieldOrPropertyWithValue("id", savedFilm.getId());
+					assertThat(film).hasFieldOrPropertyWithValue("name", "Первый фильм");
+					assertThat(film).hasFieldOrPropertyWithValue("duration", 100);
+					assertThat(film.getMpa().getId()).isEqualTo(1);
+					assertThat(film.getMpa().getName()).isEqualTo("G");
+				});
 	}
 
-	@Test //Фильм с датой релиза 28 декабря 1895 года
-	void releaseDateIs28December1895() {
-		final Film film = new Film();
-		film.setName("Название фильма");
-		film.setDescription("Описание фильма");
-		film.setReleaseDate(LocalDate.of(1895, 12, 28));
-		film.setDuration(100);
-		filmController.create(film);
+	@Test
+	public void testUpdateFilm() {
+		Film film = filmStorage.create(Film.builder()
+				.name("Old Name")
+				.description("Desc")
+				.releaseDate(LocalDate.of(2010, 5, 5))
+				.duration(90)
+				.mpa(Mpa.builder().id(1).build())
+				.build());
+
+		film.setName("Film Updated");
+		film.setDuration(190);
+		film.setMpa(Mpa.builder().id(2).build());
+		filmStorage.update(film);
+
+		Optional<Film> filmOptional = filmStorage.findOne(film.getId());
+
+		assertThat(filmOptional)
+				.isPresent()
+				.hasValueSatisfying(f -> {
+					assertThat(f).hasFieldOrPropertyWithValue("name", "Film Updated");
+					assertThat(f).hasFieldOrPropertyWithValue("duration", 190);
+					assertThat(f.getMpa().getId()).isEqualTo(2);
+					assertThat(f.getMpa().getName()).isEqualTo("PG");
+				});
 	}
 
-	@Test //Фильм с датой релиза 27 декабря 1895 года
-	void releaseDateIs27December1895() {
-		final Film film = new Film();
-		film.setName("Название фильма");
-		film.setDescription("Описание фильма");
-		film.setReleaseDate(LocalDate.of(1895, 12, 27));
-		film.setDuration(100);
-		Exception exception = assertThrows(ValidationException.class, () -> filmController.create(film));
-		assertEquals("Дата релиза — не раньше 28 декабря 1895 года", exception.getMessage());
+	@Test
+	public void testFindAllFilms() {
+		Film f1 = filmStorage.create(Film.builder().name("Film 1").releaseDate(LocalDate.now()).duration(60).mpa(Mpa.builder().id(1).build()).build());
+		Film f2 = filmStorage.create(Film.builder().name("Film 2").releaseDate(LocalDate.now()).duration(120).mpa(Mpa.builder().id(1).build()).build());
+
+		Collection<Film> films = filmStorage.findAll();
+
+		assertThat(films)
+				.isNotEmpty()
+				.hasSize(2)
+				.extracting(Film::getName)
+				.containsExactlyInAnyOrder("Film 1", "Film 2");
 	}
 
-	@Test //Продолжительность фильма - отрицательное число
-	void durationIsMinus1() {
-		final Film film = new Film();
-		film.setName("Название фильма");
-		film.setDescription("Описание фильма");
-		film.setReleaseDate(LocalDate.now());
-		film.setDuration(-1);
-		Exception exception = assertThrows(ValidationException.class, () -> filmController.create(film));
-		assertEquals("Продолжительность фильма должна быть положительным числом", exception.getMessage());
+	//ДОПОЛНИТЕЛЬНЫЕ ТЕСТЫ ВАЛИДАЦИИ
+
+	@Test
+	public void testUpdateUserNotFoundException() {
+		//Попытка изменить пользователя по несуществующему id
+		User nonExistentUser = User.builder()
+				.id(999L)
+				.email("test@email.com")
+				.login("login")
+				.birthday(LocalDate.of(2000, 1, 1))
+				.build();
+
+		org.junit.jupiter.api.Assertions.assertThrows(ru.yandex.practicum.filmorate.exception.NotFoundException.class, () -> {
+			userStorage.update(nonExistentUser);
+		});
 	}
 
-	@Test //Попытка изменить фильм без передачи id
-	void filmIdIsNullInPutRequest() {
-		final Film film = new Film();
-		Exception exception = assertThrows(ValidationException.class, () -> filmController.update(film));
-		assertEquals("id должен быть указан", exception.getMessage());
+	@Test
+	public void testUpdateUserWithNullFieldsPreservesOldData() {
+		//Передача null-полей в update() оставляет старые данные из базы
+		User originalUser = userStorage.create(User.builder()
+				.email("original@email.com")
+				.login("originalLogin")
+				.name("Original Name")
+				.birthday(LocalDate.of(1990, 5, 5))
+				.build());
+
+		User updateRequest = User.builder()
+				.id(originalUser.getId())
+				.email("updated@email.com")
+				.login(null)
+				.name(null)
+				.birthday(null)
+				.build();
+
+		User resultUser = userStorage.update(updateRequest);
+
+		//Проверяем, что email изменился, а login, name и birthday подтянулись из старой записи
+		assertThat(resultUser).hasFieldOrPropertyWithValue("email", "updated@email.com");
+		assertThat(resultUser).hasFieldOrPropertyWithValue("login", "originalLogin");
+		assertThat(resultUser).hasFieldOrPropertyWithValue("name", "Original Name");
+		assertThat(resultUser).hasFieldOrPropertyWithValue("birthday", LocalDate.of(1990, 5, 5));
 	}
 
-	@Test //Попытка изменить фильм по несуществующему id
-	void filmIdIs20InPutRequest() {
-		final Film film = new Film();
-		film.setId(20L);
-		Exception exception = assertThrows(NotFoundException.class, () -> filmController.update(film));
-		assertEquals("Фильм с id " + film.getId() + " не найден", exception.getMessage());
+	@Test
+	public void testUpdateUserNameIsEmptyPreservesOldName() {
+		//Передача null в поле name при обновлении сохраняет старое имя, даже если оно совпадало со старым логином, а логин при этом меняется
+		User originalUser = userStorage.create(User.builder()
+				.email("user@email.com")
+				.login("oldLogin")
+				.name("oldLogin")
+				.birthday(LocalDate.of(1990, 5, 5))
+				.build());
+
+		User updateRequest = User.builder()
+				.id(originalUser.getId())
+				.login("newLogin")
+				.name(null)
+				.build();
+
+		User resultUser = userStorage.update(updateRequest);
+
+		assertThat(resultUser).hasFieldOrPropertyWithValue("login", "newLogin");
+		assertThat(resultUser).hasFieldOrPropertyWithValue("name", "oldLogin");
 	}
 
-	@Test //Попытка изменить название фильма на пустое
-	void filmNameIsBlankInPutRequest() {
-		final Film film = new Film();
-		film.setId(1L);
-		film.setName(" ");
-		Exception exception = assertThrows(ValidationException.class, () -> filmController.update(film));
-		assertEquals("Название не может быть пустым", exception.getMessage());
+	@Test
+	public void testUpdateUserNameIsBlankSubstitutesLogin() {
+		//Передача пустого имени принудительно подставляет актуальный логин пользователя
+		User originalUser = userStorage.create(User.builder()
+				.email("user@email.com")
+				.login("oldLogin")
+				.name("Some Name")
+				.birthday(LocalDate.of(1990, 5, 5))
+				.build());
+
+		User updateRequest = User.builder()
+				.id(originalUser.getId())
+				.login("newLogin")
+				.name(" ")
+				.build();
+
+		User resultUser = userStorage.update(updateRequest);
+
+		assertThat(resultUser).hasFieldOrPropertyWithValue("name", "newLogin");
 	}
 
-	@Test //Попытка изменить описание фильма на длину 201
-	void filmDescriptionLengthIs201InPutRequest() {
-		final Film film = new Film();
-		film.setId(1L);
-		String description = "0123456789".repeat(20) + "0";
-		film.setDescription(description);
-		Exception exception = assertThrows(ValidationException.class, () -> filmController.update(film));
-		assertEquals("Максимальная длина описания — 200 символов", exception.getMessage());
-	}
-
-	@Test //Попытка изменить дату выхода фильма на 27 декабря 1895 года
-	void filmReleaseDateIs27December1895InPutRequest() {
-		final Film film = new Film();
-		film.setId(1L);
-		film.setReleaseDate(LocalDate.of(1895, 12, 27));
-		Exception exception = assertThrows(ValidationException.class, () -> filmController.update(film));
-		assertEquals("Дата релиза — не раньше 28 декабря 1895 года", exception.getMessage());
-	}
-
-	@Test //Попытка изменить длительность фильма на -1
-	void filmDurationIsMinus1InPutRequest() {
-		final Film film = new Film();
-		film.setId(1L);
-		film.setDuration(-1);
-		Exception exception = assertThrows(ValidationException.class, () -> filmController.update(film));
-		assertEquals("Продолжительность фильма должна быть положительным числом", exception.getMessage());
-	}
-
-	@Test //Валидный фильм
-	@Order(2) //Этот тест будет второй, с этими данными будем работать при изменении
-	void isTheValidUser() {
-		final User user = new User();
-		user.setEmail("первый@пользователь");
-		user.setLogin("Логин");
-		user.setName("Имя");
-		user.setBirthday(LocalDate.now());
-		userController.create(user);
-	}
-
-	@Test //Пустой экземпляр пользователя
-	void theUserHasNoData() {
-		final User user = new User();
-		Exception exception = assertThrows(ValidationException.class, () -> userController.create(user));
-		assertEquals("Электронная почта не может быть пустой и должна содержать символ @", exception.getMessage());
-	}
-
-	@Test //Пользователь с пустой почтой
-	void iheUserEmailIsEmpty() {
-		final User user = new User();
-		user.setEmail(" ");
-		user.setLogin("Логин");
-		user.setName("Имя");
-		user.setBirthday(LocalDate.now());
-		Exception exception = assertThrows(ValidationException.class, () -> userController.create(user));
-		assertEquals("Электронная почта не может быть пустой и должна содержать символ @", exception.getMessage());
-	}
-
-	@Test //Пользователь с неправильной почтой
-	void iheUserEmailHasNoAtSign() {
-		final User user = new User();
-		user.setEmail("КакаяТоНеправильнаяПочта");
-		user.setLogin("Логин");
-		user.setName("Имя");
-		user.setBirthday(LocalDate.now());
-		Exception exception = assertThrows(ValidationException.class, () -> userController.create(user));
-		assertEquals("Электронная почта не может быть пустой и должна содержать символ @", exception.getMessage());
-	}
-
-	@Test //Пользователь с нулл логином
-	void theUserLoginIsNull() {
-		final User user = new User();
-		user.setEmail("новый@пользователь");
-		user.setName("Имя");
-		user.setBirthday(LocalDate.now());
-		Exception exception = assertThrows(ValidationException.class, () -> userController.create(user));
-		assertEquals("Логин не может быть пустым и содержать пробелы", exception.getMessage());
-	}
-
-	@Test //Пользователь с пустым логином
-	void theUserLoginIsBlank() {
-		final User user = new User();
-		user.setEmail("новый@пользователь");
-		user.setLogin(" ");
-		user.setName("Имя");
-		user.setBirthday(LocalDate.now());
-		Exception exception = assertThrows(ValidationException.class, () -> userController.create(user));
-		assertEquals("Логин не может быть пустым и содержать пробелы", exception.getMessage());
-	}
-
-	@Test //Пустое имя пользователя приравнивается логину
-	void nullValueOfUserNameIsLogin() {
-		final User user = new User();
-		user.setEmail("новый@пользователь");
-		user.setLogin("Логин");
-		user.setBirthday(LocalDate.now());
-		final User newUser = userController.create(user);
-		assertEquals(newUser.getLogin(), newUser.getName());
-	}
-
-	@Test //Дата рождения в будущем
-	void birthdayCantBeInFuture() {
-		final User user = new User();
-		user.setEmail("новый@пользователь");
-		user.setLogin("Логин");
-		user.setName("Имя");
-		user.setBirthday(LocalDate.now().plusDays(1));
-		Exception exception = assertThrows(ValidationException.class, () -> userController.create(user));
-		assertEquals("Дата рождения не может быть в будущем", exception.getMessage());
-	}
-
-	@Test //Попытка изменить пользователя без передачи id
-	void userIdIsNullInPutRequest() {
-		final User user = new User();
-		Exception exception = assertThrows(ValidationException.class, () -> userController.update(user));
-		assertEquals("id должен быть указан", exception.getMessage());
-	}
-
-	@Test //Попытка изменить пользователя по несуществующему id
-	void userIdIs20InPutRequest() {
-		final User user = new User();
-		user.setId(20L);
-		Exception exception = assertThrows(NotFoundException.class, () -> userController.update(user));
-		assertEquals("Пользователь с id " + user.getId() + " не найден", exception.getMessage());
-	}
-
-	@Test //Попытка изменить почту на пустую
-	void userEmailIsEmptyInPutRequest() {
-		final User user = new User();
-		user.setId(1L);
-		user.setEmail(" ");
-		Exception exception = assertThrows(ValidationException.class, () -> userController.update(user));
-		assertEquals("Электронная почта не может быть пустой и должна содержать символ @", exception.getMessage());
-	}
-
-	@Test //Попытка изменить логин на пустой
-	void userLoginIsEmptyInPutRequest() {
-		final User user = new User();
-		user.setId(1L);
-		user.setLogin(" ");
-		Exception exception = assertThrows(ValidationException.class, () -> userController.update(user));
-		assertEquals("Логин не может быть пустым и содержать пробелы", exception.getMessage());
-	}
-
-	@Test //Передача пустого имени подставляет логин в имя
-	void userNameIsEmptyInPutRequest() {
-		final User user = new User();
-		user.setId(1L);
-		user.setLogin("Логин");
-		user.setName(" ");
-		final User newUser = userController.update(user);
-		assertEquals(newUser.getLogin(), newUser.getName());
-	}
-
-	@Test //Передача пустого имени без логина подставляет старый логин в имя
-	void userLoginIsNullAndUserNameIsEmptyInPutRequest() {
-		final User user = new User();
-		user.setId(1L);
-		user.setName(" ");
-		final User newUser = userController.update(user);
-		assertEquals(newUser.getLogin(), newUser.getName());
-	}
-
-	@Test //Попытка установить день рождения в будущем
-	void userBirthdayInFutureInPutRequest() {
-		final User user = new User();
-		user.setId(1L);
-		user.setBirthday(LocalDate.now().plusDays(1));
-		Exception exception = assertThrows(ValidationException.class, () -> userController.update(user));
-		assertEquals("Дата рождения не может быть в будущем", exception.getMessage());
-	}
 }

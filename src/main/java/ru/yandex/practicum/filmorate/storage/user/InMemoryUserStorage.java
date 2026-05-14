@@ -10,7 +10,7 @@ import ru.yandex.practicum.filmorate.model.User;
 import java.time.LocalDate;
 import java.util.*;
 
-@Component
+@Component("inMemoryUserStorage")
 public class InMemoryUserStorage implements UserStorage {
     private final Map<Long, User> users = new HashMap<>();
     private static final Logger log = LoggerFactory.getLogger(InMemoryUserStorage.class);
@@ -98,6 +98,68 @@ public class InMemoryUserStorage implements UserStorage {
     public Collection<User> findAll() {
         log.info("Получаем список пользователей");
         return new HashSet<>(users.values());
+    }
+
+    @Override
+    public void addFriend(Long userId, Long friendId) {
+        log.info("Добавление в друзья в памяти: {} и {}", userId, friendId);
+        User user = users.get(userId);
+        User friend = users.get(friendId);
+
+        if (user == null || friend == null) {
+            throw new NotFoundException("Пользователь или друг не найден");
+        }
+
+        user.getFriends().add(friendId);
+        friend.getFriends().add(userId);
+    }
+
+    @Override
+    public void deleteFriend(Long userId, Long friendId) {
+        log.info("Удаление из друзей в памяти: {} и {}", userId, friendId);
+        User user = users.get(userId);
+        User friend = users.get(friendId);
+
+        if (user != null && friend != null) {
+            user.getFriends().remove(friendId);
+            friend.getFriends().remove(userId);
+        }
+    }
+
+    @Override
+    public Collection<User> getFriends(Long userId) {
+        log.info("Получение списка друзей из памяти для пользователя {}", userId);
+        User user = users.get(userId);
+        if (user == null) {
+            throw new NotFoundException("Пользователь не найден");
+        }
+
+        Collection<User> friendList = new ArrayList<>();
+        for (Long friendId : user.getFriends()) {
+            if (users.containsKey(friendId)) {
+                friendList.add(users.get(friendId));
+            }
+        }
+        return friendList;
+    }
+
+    @Override
+    public Collection<User> getCommonFriends(Long userId, Long otherId) {
+        log.info("Получение общих друзей из памяти для {} и {}", userId, otherId);
+        User user = users.get(userId);
+        User other = users.get(otherId);
+
+        if (user == null || other == null) {
+            throw new NotFoundException("Пользователь не найден");
+        }
+
+        Collection<User> common = new ArrayList<>();
+        for (Long friendId : user.getFriends()) {
+            if (other.getFriends().contains(friendId) && users.containsKey(friendId)) {
+                common.add(users.get(friendId));
+            }
+        }
+        return common;
     }
 
     private long getNextId() {

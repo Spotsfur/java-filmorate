@@ -8,12 +8,9 @@ import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
 
 import java.time.LocalDate;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
+import java.util.*;
 
-@Component
+@Component("inMemoryFilmStorage")
 public class InMemoryFilmStorage implements FilmStorage {
     private final Map<Long, Film> films = new HashMap<>();
     private static final LocalDate FIRST_FILM_DATE = LocalDate.of(1895, 12, 28);
@@ -86,9 +83,47 @@ public class InMemoryFilmStorage implements FilmStorage {
         return oldFilm;
     }
 
+    @Override
+    public Optional<Film> findOne(Long id) {
+        log.info("Получение фильма по id из памяти: {}", id);
+        return Optional.ofNullable(films.get(id));
+    }
+
     public Collection<Film> findAll() {
         log.info("Получаем список фильмов");
         return new HashSet<>(films.values());
+    }
+
+    @Override
+    public void addLike(Long filmId, Long userId) {
+        log.info("Добавление лайка в памяти для фильма {} от пользователя {}", filmId, userId);
+        Film film = films.get(filmId);
+        if (film == null) {
+            throw new NotFoundException("Фильм с id " + filmId + " не найден");
+        }
+        film.getLikes().add(userId);
+    }
+
+    @Override
+    public void deleteLike(Long filmId, Long userId) {
+        log.info("Удаление лайка в памяти для фильма {} от пользователя {}", filmId, userId);
+        Film film = films.get(filmId);
+        if (film == null) {
+            throw new NotFoundException("Фильм с id " + filmId + " не найден");
+        }
+        if (!film.getLikes().contains(userId)) {
+            throw new NotFoundException("Лайк от пользователя " + userId + " не найден");
+        }
+        film.getLikes().remove(userId);
+    }
+
+    @Override
+    public Collection<Film> getPopular(int count) {
+        log.info("Получение топ {} популярных фильмов из памяти", count);
+        return films.values().stream()
+                .sorted((f1, f2) -> Integer.compare(f2.getLikes().size(), f1.getLikes().size()))
+                .limit(count)
+                .collect(java.util.stream.Collectors.toList());
     }
 
     private long getNextId() {
