@@ -114,19 +114,6 @@ public class FilmService {
         }
     }
 
-    /*private void validateMpaAndGenres(Film film) {
-        // Проверяем MPA
-        if (film.getMpa() != null && film.getMpa().getId() != null) {
-            mpaService.findById(film.getMpa().getId()); // Выбросит 404 NotFound, если ID нет в базе
-        }
-        // Проверяем каждый жанр
-        if (film.getGenres() != null && !film.getGenres().isEmpty()) {
-            for (Genre genre : film.getGenres()) {
-                genreService.findById(genre.getId()); // Выбросит 404 NotFound, если жанра нет в базе
-            }
-        }
-    }*/
-
     private void checkUserExists(Long userId) {
         userStorage.findOne(userId)
                 .orElseThrow(() -> {
