@@ -41,10 +41,15 @@ public class FilmService {
 
     public Film update(Film newFilm) {
         log.info("Обновление фильма с id: {}", newFilm.getId());
-        filmStorage.findOne(newFilm.getId())
+        if (newFilm.getId() == null) {
+            throw new ValidationException("id фильма должен быть указан");
+        }
+        Film oldFilm = filmStorage.findOne(newFilm.getId())
                 .orElseThrow(() -> new NotFoundException("Фильм с id " + newFilm.getId() + " не найден"));
-        validateFilm(newFilm);
-        return filmStorage.update(newFilm);
+
+        Film nullReplacedFilm = replaceNullDataFilm(newFilm, oldFilm);
+        validateFilm(nullReplacedFilm);
+        return filmStorage.update(nullReplacedFilm);
     }
 
     public Collection<Film> findAll() {
@@ -62,14 +67,14 @@ public class FilmService {
     public void addLike(Long filmId, Long userId) {
         log.info("Запрос на добавление лайка фильму {} от пользователя {}", filmId, userId);
         findById(filmId);
-        checkUserExists(userId);
+        checkUserExistsById(userId);
         filmStorage.addLike(filmId, userId);
     }
 
     public void removeLike(Long filmId, Long userId) {
         log.info("Запрос на удаление лайка у фильма {} от пользователя {}", filmId, userId);
         findById(filmId);
-        checkUserExists(userId);
+        checkUserExistsById(userId);
         filmStorage.deleteLike(filmId, userId);
     }
 
@@ -114,7 +119,24 @@ public class FilmService {
         }
     }
 
-    private void checkUserExists(Long userId) {
+    //Эта функция теперь переписывает нулль поля фильма при обновлении из старых данных
+    private Film replaceNullDataFilm(Film newFilm, Film oldFilm) {
+        if (newFilm.getName() == null) {
+            newFilm.setName(oldFilm.getName());
+        }
+        if (newFilm.getDescription() == null) {
+            newFilm.setDescription(oldFilm.getDescription());
+        }
+        if (newFilm.getReleaseDate() == null) {
+            newFilm.setReleaseDate(oldFilm.getReleaseDate());
+        }
+        if (newFilm.getMpa() == null) {
+            newFilm.setMpa(oldFilm.getMpa());
+        }
+        return newFilm;
+    }
+
+    private void checkUserExistsById(Long userId) {
         userStorage.findOne(userId)
                 .orElseThrow(() -> {
                     log.warn("Пользователь с id {} не найден при работе с лайками", userId);

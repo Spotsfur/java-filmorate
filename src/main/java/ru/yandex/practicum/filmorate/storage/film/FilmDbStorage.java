@@ -27,8 +27,10 @@ public class FilmDbStorage implements FilmStorage {
 
     @Override
     public Film create(Film newFilm) {
-        String sql = "INSERT INTO films (name, description, releaseDate, duration, rating_id) " +
-                "VALUES (?, ?, ?, ?, ?)";
+        String sql = """
+                INSERT INTO films (name, description, releaseDate, duration, rating_id)
+                VALUES (?, ?, ?, ?, ?)
+                """;
         KeyHolder keyHolder = new GeneratedKeyHolder();
 
         jdbc.update(connection -> {
@@ -48,8 +50,10 @@ public class FilmDbStorage implements FilmStorage {
 
     @Override
     public Film update(Film newFilm) {
-        String sql = "UPDATE films SET name = ?, description = ?, releaseDate = ?, " +
-                "duration = ?, rating_id = ? WHERE id = ?";
+        String sql = """
+                UPDATE films SET name = ?, description = ?, releaseDate = ?,
+                duration = ?, rating_id = ? WHERE id = ?
+                """;
 
         int rowsUpdated = jdbc.update(sql,
                 newFilm.getName(),
@@ -68,11 +72,13 @@ public class FilmDbStorage implements FilmStorage {
 
     @Override
     public Collection<Film> findAll() {
-        String sql = "SELECT f.id, f.name, f.description, f.releaseDate, f.duration, f.rating_id, " +
-                "r.name AS mpa_name " +
-                "FROM films f " +
-                "LEFT JOIN ratings r ON f.rating_id = r.id " +
-                "ORDER BY f.id";
+        String sql = """
+                SELECT f.id, f.name, f.description, f.releaseDate, f.duration, f.rating_id,
+                r.name AS mpa_name
+                FROM films f
+                LEFT JOIN ratings r ON f.rating_id = r.id
+                ORDER BY f.id
+                """;
 
         Collection<Film> films = jdbc.query(sql, this::mapRowToFilm);
         loadGenres(films);
@@ -81,11 +87,13 @@ public class FilmDbStorage implements FilmStorage {
 
     @Override
     public Optional<Film> findOne(Long id) {
-        String sql = "SELECT f.id, f.name, f.description, f.releaseDate, f.duration, f.rating_id, " +
-                "r.name AS mpa_name " +
-                "FROM films f " +
-                "LEFT JOIN ratings r ON f.rating_id = r.id " +
-                "WHERE f.id = ?";
+        String sql = """
+                SELECT f.id, f.name, f.description, f.releaseDate, f.duration, f.rating_id,
+                r.name AS mpa_name
+                FROM films f
+                LEFT JOIN ratings r ON f.rating_id = r.id
+                WHERE f.id = ?
+                """;
 
         Collection<Film> films = jdbc.query(sql, this::mapRowToFilm, id);
         loadGenres(films);
@@ -114,14 +122,16 @@ public class FilmDbStorage implements FilmStorage {
     public Collection<Film> getPopular(int count) {
         log.info("Получение топ {} популярных фильмов", count);
 
-        String sql = "SELECT f.id, f.name, f.description, f.releaseDate, f.duration, f.rating_id, " +
-                "r.name AS mpa_name " +
-                "FROM films f " +
-                "LEFT JOIN ratings r ON f.rating_id = r.id " +
-                "LEFT JOIN (SELECT film_id, COUNT(user_id) AS cnt FROM favorites GROUP BY film_id) fav " +
-                "ON f.id = fav.film_id " +
-                "ORDER BY COALESCE(fav.cnt, 0) DESC, f.id ASC " +
-                "LIMIT ?";
+        String sql = """
+                SELECT f.id, f.name, f.description, f.releaseDate, f.duration, f.rating_id,
+                r.name AS mpa_name
+                FROM films f
+                LEFT JOIN ratings r ON f.rating_id = r.id
+                LEFT JOIN (SELECT film_id, COUNT(user_id) AS cnt FROM favorites GROUP BY film_id) fav
+                ON f.id = fav.film_id
+                ORDER BY COALESCE(fav.cnt, 0) DESC, f.id ASC
+                LIMIT ?
+                """;
 
         Collection<Film> popularFilms = jdbc.query(sql, this::mapRowToFilm, count);
         loadGenres(popularFilms);
@@ -151,19 +161,20 @@ public class FilmDbStorage implements FilmStorage {
     }
 
     private void loadGenres(Collection<Film> films) {
-        if (films == null || films.isEmpty()) return;
-
-        List<Long> ids = films.stream().map(Film::getId).toList();
-
-        List<String> idStrings = new ArrayList<>();
-        for (Long id : ids) {
-            idStrings.add(String.valueOf(id));
+        if (films == null || films.isEmpty()) {
+            return;
         }
 
-        String sql = "SELECT fg.film_id, g.id AS genre_id, g.name AS genre_name " +
-                "FROM film_genres fg " +
-                "JOIN genres g ON fg.genre_id = g.id " +
-                "WHERE fg.film_id IN (" + String.join(",", idStrings) + ")";
+        List<String> idStrings = films.stream()
+                .map(film -> String.valueOf(film.getId()))
+                .toList();
+
+        String sql = """
+            SELECT fg.film_id, g.id AS genre_id, g.name AS genre_name
+            FROM film_genres fg
+            JOIN genres g ON fg.genre_id = g.id
+            WHERE fg.film_id IN (%s)
+            """.formatted(String.join(",", idStrings));
 
         jdbc.query(sql, (rs) -> {
             while (rs.next()) {
@@ -186,6 +197,7 @@ public class FilmDbStorage implements FilmStorage {
             return null;
         });
     }
+
 
     private Film mapRowToFilm(ResultSet rs, int rowNum) throws SQLException {
         return Film.builder()

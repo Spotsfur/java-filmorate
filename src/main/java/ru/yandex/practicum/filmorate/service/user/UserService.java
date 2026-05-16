@@ -4,9 +4,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
+import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
+import java.time.LocalDate;
 import java.util.*;
 
 @Slf4j
@@ -19,11 +21,24 @@ public class UserService {
     }
 
     public User create(User newUser) {
+        log.info("Добавляем нового пользователя");
+        createValidation(newUser);
+        if (newUser.getName().isBlank()) {
+            newUser.setName(newUser.getLogin());
+        }
         return userStorage.create(newUser);
     }
 
     public User update(User newUser) {
-        return userStorage.update(newUser);
+        log.info("Изменяем пользователя");
+        //Отсюда валятся эксепшны
+        if (newUser.getId() == null) {
+            throw new ValidationException("id должен быть указан");
+        }
+        findById(newUser.getId());
+        User oldUser = updateValidation(newUser);
+        User nullReplacedUser = replaceNullDataUser(newUser, oldUser);
+        return userStorage.update(nullReplacedUser);
     }
 
     public Collection<User> findAll() {
@@ -52,6 +67,7 @@ public class UserService {
 
     public Collection<User> findUserFriends(Long userId) {
         log.info("Запрос списка друзей для пользователя {}", userId);
+        //Я обращаюсь к этой функции для валидации поиска по ИД и выбрасыванию исключения
         findById(userId);
         return userStorage.getFriends(userId);
     }
@@ -61,5 +77,72 @@ public class UserService {
         findById(userId);
         findById(otherId);
         return userStorage.getCommonFriends(userId, otherId);
+    }
+
+    private void createValidation(User newUser) {
+        if (newUser.getEmail() == null || newUser.getEmail().isBlank() || newUser.getEmail().indexOf('@') == -1) {
+            log.warn("Попытка добавления пользователя с неправильной электронной почтой");
+            throw new ValidationException("Электронная почта не может быть пустой и должна содержать символ @");
+        }
+        if (newUser.getLogin() == null || newUser.getLogin().isBlank() || newUser.getLogin().indexOf(' ') >= 0) {
+            log.warn("Попытка добавления пользователя с неправильным логином");
+            throw new ValidationException("Логин не может быть пустым и содержать пробелы");
+        }
+        if (newUser.getName() == null || newUser.getName().isBlank()) {
+            newUser.setName(newUser.getLogin());
+        }
+        if (newUser.getBirthday().isAfter(LocalDate.now())) {
+            log.warn("Попытка добавления пользователя с неправильной датой рождения");
+            throw new ValidationException("Дата рождения не может быть в будущем");
+        }
+    }
+
+    private User updateValidation(User newUser) {
+        if (newUser.getId() == null) {
+            log.warn("Попытка изменения пользователя с неправильным id");
+            throw new ValidationException("id должен быть указан");
+        }
+        User oldUser = userStorage.findOne(newUser.getId())
+                .orElseThrow(() -> {
+                    log.warn("Попытка изменить пользователя, id которого не существует в базе");
+                    return new ValidationException("Пользователь с id " + newUser.getId() + " не найден");
+                });
+        if (newUser.getEmail() != null) {
+            if (newUser.getEmail().isBlank() || newUser.getEmail().indexOf('@') == -1) {
+                log.warn("Попытка изменения электронной почты пользователя на неправильное");
+                throw new ValidationException("Электронная почта не может быть пустой и должна содержать символ @");
+            }
+        }
+        if (newUser.getLogin() != null) {
+            if (newUser.getLogin().isBlank() || newUser.getLogin().indexOf(' ') >= 0) {
+                log.warn("Попытка изменения логина пользователя на неправильное");
+                throw new ValidationException("Логин не может быть пустым и содержать пробелы");
+            }
+        }
+        if (newUser.getBirthday() != null) {
+            if (newUser.getBirthday().isAfter(LocalDate.now())) {
+                log.warn("Попытка изменения даты рождения пользователя на дату в будущем");
+                throw new ValidationException("Дата рождения не может быть в будущем");
+            }
+        }
+        return oldUser;
+    }
+
+    private User replaceNullDataUser (User newUser, User oldUser) {
+        if (newUser.getEmail() == null) {
+            newUser.setEmail(oldUser.getEmail());
+        }
+        if (newUser.getBirthday() == null) {
+            newUser.setBirthday(oldUser.getBirthday());
+        }
+        if (newUser.getLogin() == null) {
+            newUser.setLogin(oldUser.getLogin());
+        }
+        if (newUser.getName() == null) {
+            newUser.setName(oldUser.getName());
+        } else if (newUser.getName().isBlank()) {
+            newUser.setName(newUser.getLogin());
+        }
+        return newUser;
     }
 }
