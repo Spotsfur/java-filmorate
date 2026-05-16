@@ -100,6 +100,10 @@ public class InMemoryUserStorage implements UserStorage {
         return new HashSet<>(users.values());
     }
 
+    public boolean existsById (Long id) {
+        return users.containsKey(id);
+    }
+
     @Override
     public void addFriend(Long userId, Long friendId) {
         log.info("Добавление в друзья в памяти: {} и {}", userId, friendId);

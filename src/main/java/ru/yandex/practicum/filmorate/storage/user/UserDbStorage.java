@@ -60,6 +60,17 @@ public class UserDbStorage implements UserStorage {
     }
 
     @Override
+    public boolean existsById(Long id) {
+        String sql = """
+            SELECT COUNT(1)
+            FROM users
+            WHERE id = ?
+            """;
+        Integer count = jdbc.queryForObject(sql, Integer.class, id);
+        return count > 0;
+    }
+
+    @Override
     public void addFriend(Long userId, Long friendId) {
         findOne(userId).orElseThrow(() -> new NotFoundException("Пользователь не найден"));
         findOne(friendId).orElseThrow(() -> new NotFoundException("Друг не найден"));

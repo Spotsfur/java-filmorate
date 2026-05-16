@@ -60,22 +60,36 @@ public class UserService {
 
     public void deleteFriend(Long userId, Long friendId) {
         log.info("Запрос от пользователя {} на удаление из друзей {}", userId, friendId);
-        findById(userId);
-        findById(friendId);
+        if (!userStorage.existsById(userId)) {
+            log.warn("Пользователь с id {} не найден", userId);
+            throw new NotFoundException("Пользователь с id " + userId + " не найден");
+        }
+        if (!userStorage.existsById(friendId)) {
+            log.warn("Пользователь с id {} не найден", friendId);
+            throw new NotFoundException("Пользователь с id " + friendId + " не найден");
+        }
         userStorage.deleteFriend(userId, friendId);
     }
 
     public Collection<User> findUserFriends(Long userId) {
         log.info("Запрос списка друзей для пользователя {}", userId);
-        //Я обращаюсь к этой функции для валидации поиска по ИД и выбрасыванию исключения
-        findById(userId);
+        if (!userStorage.existsById(userId)) {
+            log.warn("Пользователь с id {} не найден", userId);
+            throw new NotFoundException("Пользователь с id " + userId + " не найден");
+        }
         return userStorage.getFriends(userId);
     }
 
     public Collection<User> findMutualFriends(Long userId, Long otherId) {
         log.info("Запрос общих друзей для пользователей {} и {}", userId, otherId);
-        findById(userId);
-        findById(otherId);
+        if (!userStorage.existsById(userId)) {
+            log.warn("Пользователь с id {} не найден", userId);
+            throw new NotFoundException("Пользователь с id " + userId + " не найден");
+        }
+        if (!userStorage.existsById(otherId)) {
+            log.warn("Пользователь с id {} не найден", otherId);
+            throw new NotFoundException("Пользователь с id " + otherId + " не найден");
+        }
         return userStorage.getCommonFriends(userId, otherId);
     }
 

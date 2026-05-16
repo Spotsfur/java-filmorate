@@ -15,6 +15,8 @@ public interface UserStorage {
 
     Optional<User> findOne(Long id);
 
+    public boolean existsById(Long id);
+
     void addFriend(Long userId, Long friendId);
 
     void deleteFriend(Long userId, Long friendId);
