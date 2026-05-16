@@ -100,7 +100,7 @@ public class InMemoryUserStorage implements UserStorage {
         return new HashSet<>(users.values());
     }
 
-    public boolean existsById (Long id) {
+    public boolean existsById(Long id) {
         return users.containsKey(id);
     }
 
