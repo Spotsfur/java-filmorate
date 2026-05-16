@@ -128,7 +128,7 @@ public class UserService {
         return oldUser;
     }
 
-    private User replaceNullDataUser (User newUser, User oldUser) {
+    private User replaceNullDataUser(User newUser, User oldUser) {
         if (newUser.getEmail() == null) {
             newUser.setEmail(oldUser.getEmail());
         }
